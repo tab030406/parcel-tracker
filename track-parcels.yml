@@ -1,0 +1,35 @@
+name: 查詢郵局包裹進度
+
+on:
+  schedule:
+    # 每 2 小時查一次（UTC 時間，台灣時間 = UTC+8）
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {}   # 允許在 GitHub 網頁上手動按「Run workflow」立即查一次
+
+permissions:
+  contents: write   # 需要這個權限才能把 results.json 推回 repo
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 取出 repo
+        uses: actions/checkout@v4
+
+      - name: 安裝 jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: 執行查詢
+        run: bash scripts/track.sh
+
+      - name: 提交更新後的 results.json
+        run: |
+          git config user.name "parcel-tracker-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add results.json
+          if git diff --cached --quiet; then
+            echo "沒有變動，不需要提交"
+          else
+            git commit -m "chore: 更新包裹查詢結果 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
